@@ -37,6 +37,8 @@ namespace xlib::logger {
         yy_md_HMS_withDotDot,
     };
 
+    std::string _get_log_level_str(uint8_t _level);
+
     struct LoggerEntity {
         LogLevel    level;
         std::string timestamp;
@@ -49,9 +51,17 @@ namespace xlib::logger {
             title.clear();
             information.clear();
         }
+        [[nodiscard]] std::string format() const {
+            std::ostringstream oss;
+            const std::string level_str = _get_log_level_str(static_cast<uint8_t>(level));
+            oss <<  level_str      << " "
+                <<  timestamp      << " "
+                <<  title          << " > "
+                <<  information;
+            return  oss.str();
+        }
     };
 
-    std::string _get_log_level_str(uint8_t _level);
     void _command_print(const LoggerEntity& _entity);
 
     std::optional<std::fstream> _load_file(const std::string& _file_name,
@@ -59,8 +69,9 @@ namespace xlib::logger {
 
     class LogWriter {
         /// 0b00 - no show, 0b01 - show_cmd, 0b10 - show_file, 0b11 - both
-        uint8_t show_flag_ = 0b11;
+        uint8_t show_flag_ = 0b00;
         LoggerEntity entity_ {};
+        std::ofstream file_{};
 
         std::string log_time_style_strs[18] = {
             "%Y%m%d %H:%M:%S",       //YYYY_md_HMS_withNone,
@@ -83,9 +94,11 @@ namespace xlib::logger {
             "%y.%m.%d %H:%M:%S",     //yy_md_HMS_withDot,
             "%y.%m.%d.%H:%M:%S",     //yy_md_HMS_withDotDot,
         };
-
-        void write();
     public:
+        explicit LogWriter(const std::string& _file_log);
+        LogWriter();
+        ~LogWriter();
+
         void set_log_level(const LogLevel _level) {
             entity_.level = _level;
         }
@@ -104,10 +117,7 @@ namespace xlib::logger {
             show_flag_ = _flag;
         }
 
-        void write_cmd() const {
-            if (show_flag_ & 0b01)
-                _command_print(entity_);
-        }
+        void write();
         LoggerEntity& get_entity() {return entity_;}
     };
 }

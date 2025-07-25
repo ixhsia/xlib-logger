@@ -13,11 +13,7 @@ std::string xlib::logger::_get_log_level_str(const uint8_t _level) {
 
 void xlib::logger::_command_print(const LoggerEntity &_entity) {
     const std::string level_str = _get_log_level_str(static_cast<uint8_t>(_entity.level));
-    std::cout
-    <<  level_str              << " "
-    <<  _entity.timestamp      << " "
-    <<  _entity.title          << " > "
-    <<  _entity.information    << std::endl;
+    std::cout << _entity.format() << std::endl;
 }
 
 std::optional<std::fstream> xlib::logger::_load_file(const std::string &_file_name, const std::ios_base::openmode _mode) {
@@ -34,9 +30,25 @@ void xlib::logger::LogWriter::write() {
         _command_print(entity_);
     }
     if (show_flag_ & 0b10) {
-
+        file_ << entity_.format() << std::endl;;
+        file_.flush();
     }
     entity_.clean();
+}
+
+xlib::logger::LogWriter::LogWriter(const std::string &_file_log) {
+    show_flag_ |= 0b11;
+    file_.open(_file_log, std::ios::out | std::ios::app);
+    if (!file_.is_open())
+        std::cerr << "Failed to open file: " << _file_log << std::endl;
+}
+
+xlib::logger::LogWriter::LogWriter() {
+    show_flag_ |= 0b01;
+}
+
+xlib::logger::LogWriter::~LogWriter() {
+    file_.close();
 }
 
 void xlib::logger::LogWriter::set_timestamp(const LogTimeStyle _style) {
