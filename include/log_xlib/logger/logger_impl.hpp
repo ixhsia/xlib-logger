@@ -103,7 +103,7 @@ namespace xlib::logger {
             entity_.level = _level;
         }
 
-        void set_timestamp(LogTimeStyle _style);
+        std::string set_timestamp(LogTimeStyle _style);
         void set_timestamp(const std::string& _timestamp) {
             entity_.timestamp = _timestamp;
         }
@@ -119,6 +119,15 @@ namespace xlib::logger {
 
         void write();
         LoggerEntity& get_entity() {return entity_;}
+
+    public:
+        void log(LogLevel _level, const std::string& _tittle, const std::string& _info, LogTimeStyle _time_style = YYYY_md_HMS_withDash);
+        void debug(const std::string& _tittle, const std::string& _info, LogTimeStyle _time_style = YYYY_md_HMS_withDash);
+        void info(const std::string& _tittle, const std::string& _info, LogTimeStyle _time_style = YYYY_md_HMS_withDash);
+        void warning(const std::string& _tittle, const std::string& _info, LogTimeStyle _time_style = YYYY_md_HMS_withDash);
+        void error(const std::string& _tittle, const std::string& _info, LogTimeStyle _time_style = YYYY_md_HMS_withDash);
+        void fatal(const std::string& _tittle, const std::string& _info, LogTimeStyle _time_style = YYYY_md_HMS_withDash);
+
     };
 }
 #endif // LOGGER_IMPL_HPP
