@@ -12,8 +12,28 @@ std::string xlib::logger::_get_log_level_str(const uint8_t _level) {
 }
 
 void xlib::logger::_command_print(const LoggerEntity &_entity) {
-    const std::string level_str = _get_log_level_str(static_cast<uint8_t>(_entity.level));
     std::cout << _entity.format() << std::endl;
+}
+
+void xlib::logger::LogWriter::init_from_file_log(const std::string &_file_log) {
+    show_flag_ = xlib::Flags::ShowSinkFlag::Sink_All;
+    file_.open(_file_log, std::ios::out | std::ios::app);
+    if (!file_.is_open())
+        std::cerr << "Failed to open file: " << _file_log << std::endl;
+}
+
+void xlib::logger::LogWriter::init_from_file_config(const std::string &_file_config) {
+    show_flag_ = xlib::Flags::ShowSinkFlag::Sink_All;
+    parse_ = toml::parse_file(_file_config);
+    try {
+        if (parse_["version"].value_or(0) > VERSION || parse_["version"].value_or(0) < 1) {
+            std::cerr << "Failed to parse config file: " << _file_config    << "\n"
+                      << "Log will be written in path './error.log'..."     << std::endl;
+            init_from_file_log("./error.log");
+            return void();
+        }
+    } catch (...) {throw std::runtime_error("Illegal config file: " + _file_config);}
+
 }
 
 void xlib::logger::LogWriter::write_ipt_impl() {
@@ -28,33 +48,36 @@ void xlib::logger::LogWriter::write_ipt_impl() {
 }
 
 void xlib::logger::LogWriter::thread_write_ipt_impl() {
-    while (thread_is_run_ || !thread_queue_.empty()) {
-        std::unique_lock<std::mutex> lock(thread_mutex_);
-        thread_cv_.wait(lock, [this] {return !thread_queue_.empty() || !thread_is_run_;});
-        while (!thread_queue_.empty()) {
-            std::string tmp = std::move(thread_queue_.front());
-            thread_queue_.pop_front();
-            lock.unlock();
-            if (file_.is_open())
-                file_ << tmp << std::endl;
-            lock.lock();
+    if (show_flag_ & xlib::Flags::ShowSinkFlag::Sink_CommandLine)
+        _command_print(entity_);
+    if (show_flag_ & xlib::Flags::ShowSinkFlag::Sink_File)
+        while (thread_is_run_ || !thread_queue_.empty()) {
+            std::unique_lock<std::mutex> lock(thread_mutex_);
+            thread_cv_.wait(lock, [this] {return !thread_queue_.empty() || !thread_is_run_;});
+            while (!thread_queue_.empty()) {
+                std::string tmp = std::move(thread_queue_.front());
+                thread_queue_.pop_front();
+                lock.unlock();
+                if (file_.is_open())
+                    file_ << tmp << std::endl;
+                lock.lock();
+            }
         }
-    }
 }
 
-xlib::logger::LogWriter::LogWriter(const std::string &_file_log) {
-    show_flag_ |= 0b11;
-    file_.open(_file_log, std::ios::out | std::ios::app);
-    if (!file_.is_open())
-        std::cerr << "Failed to open file: " << _file_log << std::endl;
-    if constexpr (ENABLE_THREAD_LOGGER) {
-        thread_is_run_ = true;
-        thread_forWriting_ = std::thread(&LogWriter::thread_write_ipt_impl, this);
-    }
+std::unique_ptr<xlib::logger::LogWriter> xlib::logger::LogWriter::from_file_config(const std::string &_file_config) {
+    auto ptr = std::make_unique<LogWriter>();
+    ptr->init_from_file_config(_file_config);
+    return ptr;
+}
+
+std::unique_ptr<xlib::logger::LogWriter> xlib::logger::LogWriter::from_file_log(const std::string &_file_log) {
+    auto ptr = std::make_unique<LogWriter>();
+    ptr->init_from_file_log(_file_log);
+    return ptr;
 }
 
 xlib::logger::LogWriter::LogWriter() {
-    show_flag_ |= 0b01;
     if constexpr (ENABLE_THREAD_LOGGER) {
         thread_is_run_ = true;
         thread_forWriting_ = std::thread(&LogWriter::thread_write_ipt_impl, this);
@@ -76,7 +99,7 @@ std::string xlib::logger::LogWriter::set_timestamp(const LogTimeStyle _style) {
     localtime_r(&now, &tm);
 
     std::ostringstream oss;
-    oss << '(' << std::put_time(&tm, log_time_style_strs[static_cast<uint8_t>(_style)].c_str()) << ')';
+    oss << '(' << std::put_time(&tm, log_time_style_strs_[static_cast<uint8_t>(_style)].c_str()) << ')';
     entity_.timestamp = oss.str();
     return oss.str();
 }

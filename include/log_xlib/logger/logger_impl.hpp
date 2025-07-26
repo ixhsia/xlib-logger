@@ -6,11 +6,22 @@
 #include <chrono>
 #include <deque>
 #include <iostream>
-#include <format>
 #include <mutex>
 #include <thread>
+#include <vector>
+#include "logger/sink.hpp"
+#include "toml.hpp"
+#include "definations.hpp"
 
 #define ENABLE_THREAD_LOGGER true
+
+/// 仅仅是想实现类似独热编码的效果，只是不愿意 '#define'
+namespace xlib::Flags::ShowSinkFlag {
+    constexpr uint8_t Show_None            = 0b0000'0000;
+    constexpr uint8_t Sink_CommandLine     = 0b0000'0001;
+    constexpr uint8_t Sink_File            = 0b0000'0010;
+    constexpr uint8_t Sink_All             = Sink_CommandLine | Sink_File;
+}
 
 namespace xlib::logger {
     enum SetStatus
@@ -79,18 +90,24 @@ namespace xlib::logger {
 #define ENABLE_THREAD_LOGGER false
 #endif
     class LogWriter {
+        // 日志基本变量
         LoggerEntity entity_ {};
         std::ofstream file_{};
-        /// 0b00 - no show, 0b01 - show_cmd, 0b10 - show_file, 0b11 - both
-        uint8_t show_flag_ = 0b00;
+        std::vector<Sink_Base> sinks_{};
+        uint8_t show_flag_ = 0x00;
 
+        // 多线程配置
         std::deque<std::string> thread_queue_{};
         std::mutex thread_mutex_;
         std::condition_variable thread_cv_;
         std::atomic<bool> thread_is_run_ = false;
         std::thread thread_forWriting_;
 
-        std::string log_time_style_strs[18] = {
+        // toml解析器
+        toml::table parse_{};
+
+        // 日志时间格式字符串
+        std::string log_time_style_strs_[18] = {
             "%Y%m%d %H:%M:%S",       //YYYY_md_HMS_withNone,
             "%Y/%m/%d %H:%M:%S",     //YYYY_md_HMS_withSlash,
             "%Y/%m/%d/%H:%M:%S",     //YYYY_md_HMS_withSlashSlash,
@@ -111,8 +128,10 @@ namespace xlib::logger {
             "%y.%m.%d %H:%M:%S",     //yy_md_HMS_withDot,
             "%y.%m.%d.%H:%M:%S",     //yy_md_HMS_withDotDot,
         };
+
     public:
-        explicit LogWriter(const std::string& _file_log);
+        static std::unique_ptr<LogWriter> from_file_config(const std::string& _file_config);
+        static std::unique_ptr<LogWriter> from_file_log(const std::string& _file_log);
         LogWriter();
         ~LogWriter();
 
@@ -133,9 +152,9 @@ namespace xlib::logger {
             show_flag_ = _flag;
         }
 
-        LoggerEntity& get_entity() {return entity_;}
-
-    public:
+    private:
+        void init_from_file_log(const std::string& _file_log);
+        void init_from_file_config(const std::string& _file_config);
         void write_ipt_impl();
         void thread_write_ipt_impl();
 
