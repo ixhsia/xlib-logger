@@ -16,14 +16,14 @@ void xlib::logger::_command_print(const LoggerEntity &_entity) {
 }
 
 void xlib::logger::LogWriter::init_from_file_log(const std::string &_file_log) {
-    show_flag_ = xlib::Flags::ShowSinkFlag::Sink_All;
+    show_flag_ |= xlib::Flags::ShowSinkFlag::Sink_All;
     file_.open(_file_log, std::ios::out | std::ios::app);
     if (!file_.is_open())
         std::cerr << "Failed to open file: " << _file_log << std::endl;
 }
 
 void xlib::logger::LogWriter::init_from_file_config(const std::string &_file_config) {
-    show_flag_ = xlib::Flags::ShowSinkFlag::Sink_All;
+    show_flag_ |= xlib::Flags::ShowSinkFlag::Sink_All;
     parse_ = toml::parse_file(_file_config);
     try {
         if (parse_["version"].value_or(0) > VERSION || parse_["version"].value_or(0) < 1) {
@@ -32,8 +32,19 @@ void xlib::logger::LogWriter::init_from_file_config(const std::string &_file_con
             init_from_file_log("./error.log");
             return void();
         }
+        std::cout << "OK"<< std::endl;
     } catch (...) {throw std::runtime_error("Illegal config file: " + _file_config);}
+    const std::string file_log = parse_["log_file"].value_or("log.log");
+    file_.open(file_log, std::ios::out | std::ios::app);
+    if (!file_.is_open())
+        std::cerr << "Failed to open file: " << file_log << std::endl;
 
+    //TODO: Configure
+    //config logger
+    auto *logger = parse_["logger"].as_table();
+    this->set_logger_level_line(static_cast<LogLevel>(logger->at("level").value_or(1)));
+    this->set_logger_thread_isEnabled(logger->at("thread").value_or(true));
+    this->set_show_flag(logger->at("show_flag").value_or(0x03));
 }
 
 void xlib::logger::LogWriter::write_ipt_impl() {
@@ -68,24 +79,26 @@ void xlib::logger::LogWriter::thread_write_ipt_impl() {
 std::unique_ptr<xlib::logger::LogWriter> xlib::logger::LogWriter::from_file_config(const std::string &_file_config) {
     auto ptr = std::make_unique<LogWriter>();
     ptr->init_from_file_config(_file_config);
+    ptr->set_thread_ifEnabled();
     return ptr;
 }
 
 std::unique_ptr<xlib::logger::LogWriter> xlib::logger::LogWriter::from_file_log(const std::string &_file_log) {
     auto ptr = std::make_unique<LogWriter>();
     ptr->init_from_file_log(_file_log);
+    ptr->set_thread_ifEnabled();
     return ptr;
 }
 
-xlib::logger::LogWriter::LogWriter() {
-    if constexpr (ENABLE_THREAD_LOGGER) {
+void xlib::logger::LogWriter::set_thread_ifEnabled() {
+    if (is_thread_log_enabled_) {
         thread_is_run_ = true;
         thread_forWriting_ = std::thread(&LogWriter::thread_write_ipt_impl, this);
     }
 }
 
 xlib::logger::LogWriter::~LogWriter() {
-    if constexpr (ENABLE_THREAD_LOGGER) {
+    if (is_thread_log_enabled_) {
         thread_is_run_ = false;
         thread_cv_.notify_all();
         thread_forWriting_.join();
@@ -93,7 +106,7 @@ xlib::logger::LogWriter::~LogWriter() {
     file_.close();
 }
 
-std::string xlib::logger::LogWriter::set_timestamp(const LogTimeStyle _style) {
+std::string xlib::logger::LogWriter::set_msg_timestamp(const LogTimeStyle _style) {
     const auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::tm tm = *std::localtime(&now);
     localtime_r(&now, &tm);
@@ -105,7 +118,7 @@ std::string xlib::logger::LogWriter::set_timestamp(const LogTimeStyle _style) {
 }
 
 void xlib::logger::LogWriter::log() {
-    if constexpr (ENABLE_THREAD_LOGGER) {
+    if (is_thread_log_enabled_) {
         {
             std::lock_guard<std::mutex> lock(thread_mutex_);
             thread_queue_.push_back(entity_.format());
@@ -120,7 +133,7 @@ void xlib::logger::LogWriter::log(const LogLevel _level,const std::string& _titt
     entity_.clean();
     entity_ = {
         .level = _level,
-        .timestamp = set_timestamp(_time_style),
+        .timestamp = set_msg_timestamp(_time_style),
         .title = _tittle,
         .information = _info,
     };

@@ -13,8 +13,6 @@
 #include "toml.hpp"
 #include "definations.hpp"
 
-#define ENABLE_THREAD_LOGGER true
-
 /// 仅仅是想实现类似独热编码的效果，只是不愿意 '#define'
 namespace xlib::Flags::ShowSinkFlag {
     constexpr uint8_t Show_None            = 0b0000'0000;
@@ -86,15 +84,14 @@ namespace xlib::logger {
 
     void _command_print(const LoggerEntity& _entity);
 
-#ifndef ENABLE_THREAD_LOGGER
-#define ENABLE_THREAD_LOGGER false
-#endif
     class LogWriter {
         // 日志基本变量
         LoggerEntity entity_ {};
         std::ofstream file_{};
         std::vector<Sink_Base> sinks_{};
         uint8_t show_flag_ = 0x00;
+        bool is_thread_log_enabled_ = true;
+        LogLevel log_level_line_ = XLIB_LOG_LEVEL_DEBUG;
 
         // 多线程配置
         std::deque<std::string> thread_queue_{};
@@ -132,17 +129,21 @@ namespace xlib::logger {
     public:
         static std::unique_ptr<LogWriter> from_file_config(const std::string& _file_config);
         static std::unique_ptr<LogWriter> from_file_log(const std::string& _file_log);
-        LogWriter();
+        LogWriter() = default;
+        void set_thread_ifEnabled();
         ~LogWriter();
 
-        void set_log_level(const LogLevel _level) {
+        void set_logger_level_line(const LogLevel _level) {
+            log_level_line_ = _level;
+        }
+        void set_logger_thread_isEnabled(const bool _enabled) {
+            is_thread_log_enabled_ = _enabled;
+        }
+
+        void set_msg_level(const LogLevel _level) {
             entity_.level = _level;
         }
-        std::string set_timestamp(LogTimeStyle _style);
-        void set_timestamp(const std::string& _timestamp) {
-            entity_.timestamp = _timestamp;
-        }
-        void set_title(const std::string& _title) {
+        void set_msg_title(const std::string& _title) {
             entity_.title = _title;
         }
         void set_information(const std::string& _information) {
@@ -151,6 +152,10 @@ namespace xlib::logger {
         void set_show_flag(const uint8_t _flag) {
             show_flag_ = _flag;
         }
+        void set_msg_timestamp(const std::string& _timestamp) {
+            entity_.timestamp = _timestamp;
+        }
+        std::string set_msg_timestamp(LogTimeStyle _style);
 
     private:
         void init_from_file_log(const std::string& _file_log);
