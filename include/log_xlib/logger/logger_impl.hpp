@@ -1,12 +1,23 @@
 #ifndef LOGGER_IMPL_HPP
 #define LOGGER_IMPL_HPP
+#include <atomic>
 #include <string>
 #include <fstream>
 #include <chrono>
+#include <deque>
 #include <iostream>
 #include <format>
+#include <mutex>
+#include <thread>
+
+#define ENABLE_THREAD_LOGGER true
 
 namespace xlib::logger {
+    enum SetStatus
+    {
+        Disabled = 0,
+        Enabled,
+    };
     enum LogLevel {
         XLIB_LOG_LEVEL_DEBUG = 0,
         XLIB_LOG_LEVEL_INFO,
@@ -64,14 +75,20 @@ namespace xlib::logger {
 
     void _command_print(const LoggerEntity& _entity);
 
-    std::optional<std::fstream> _load_file(const std::string& _file_name,
-        std::ios_base::openmode _mode = std::ios::in | std::ios::out | std::ios::app);
-
+#ifndef ENABLE_THREAD_LOGGER
+#define ENABLE_THREAD_LOGGER false
+#endif
     class LogWriter {
-        /// 0b00 - no show, 0b01 - show_cmd, 0b10 - show_file, 0b11 - both
-        uint8_t show_flag_ = 0b00;
         LoggerEntity entity_ {};
         std::ofstream file_{};
+        /// 0b00 - no show, 0b01 - show_cmd, 0b10 - show_file, 0b11 - both
+        uint8_t show_flag_ = 0b00;
+
+        std::deque<std::string> thread_queue_{};
+        std::mutex thread_mutex_;
+        std::condition_variable thread_cv_;
+        std::atomic<bool> thread_is_run_ = false;
+        std::thread thread_forWriting_;
 
         std::string log_time_style_strs[18] = {
             "%Y%m%d %H:%M:%S",       //YYYY_md_HMS_withNone,
@@ -102,7 +119,6 @@ namespace xlib::logger {
         void set_log_level(const LogLevel _level) {
             entity_.level = _level;
         }
-
         std::string set_timestamp(LogTimeStyle _style);
         void set_timestamp(const std::string& _timestamp) {
             entity_.timestamp = _timestamp;
@@ -117,10 +133,14 @@ namespace xlib::logger {
             show_flag_ = _flag;
         }
 
-        void write();
         LoggerEntity& get_entity() {return entity_;}
 
     public:
+        void write_ipt_impl();
+        void thread_write_ipt_impl();
+
+    public:
+        void log();
         void log(LogLevel _level, const std::string& _tittle, const std::string& _info, LogTimeStyle _time_style = YYYY_md_HMS_withDash);
         void debug(const std::string& _tittle, const std::string& _info, LogTimeStyle _time_style = YYYY_md_HMS_withDash);
         void info(const std::string& _tittle, const std::string& _info, LogTimeStyle _time_style = YYYY_md_HMS_withDash);

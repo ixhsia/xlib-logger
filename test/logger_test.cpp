@@ -7,10 +7,10 @@ int main(){
     writer.set_log_level(xlib::logger::LogLevel::XLIB_LOG_LEVEL_DEBUG);
     writer.set_information("This is a test log message.");
     writer.set_timestamp(xlib::logger::yy_md_HMS_withDash);
-    writer.write();
-    writer.set_title("Test Logger");
+    writer.log();
+    writer.set_title("Test Log");
     writer.set_log_level(xlib::logger::LogLevel::XLIB_LOG_LEVEL_DEBUG);
-    writer.set_information("This is a test log message.");
+    writer.set_information("This is a test log mese.");
     writer.set_timestamp(xlib::logger::yy_md_HMS_withDash);
-    writer.write();
+    writer.log();
 }

@@ -1,7 +1,5 @@
 #include "logger/logger_impl.hpp"
 
-#include <utility>
-
 std::string xlib::logger::_get_log_level_str(const uint8_t _level) {
     switch (_level) {
         case 0:  return "[DEBUG]";
@@ -18,16 +16,7 @@ void xlib::logger::_command_print(const LoggerEntity &_entity) {
     std::cout << _entity.format() << std::endl;
 }
 
-std::optional<std::fstream> xlib::logger::_load_file(const std::string &_file_name, const std::ios_base::openmode _mode) {
-    std::fstream file(_file_name, _mode);
-    if (!file.is_open()) {
-        std::cerr << "Failed to open file: " << _file_name << std::endl;
-        return std::nullopt;
-    }
-    return file;
-}
-
-void xlib::logger::LogWriter::write() {
+void xlib::logger::LogWriter::write_ipt_impl() {
     if (show_flag_ & 0b01) {
         _command_print(entity_);
     }
@@ -38,18 +27,46 @@ void xlib::logger::LogWriter::write() {
     entity_.clean();
 }
 
+void xlib::logger::LogWriter::thread_write_ipt_impl() {
+    while (thread_is_run_ || !thread_queue_.empty()) {
+        std::unique_lock<std::mutex> lock(thread_mutex_);
+        thread_cv_.wait(lock, [this] {return !thread_queue_.empty() || !thread_is_run_;});
+        while (!thread_queue_.empty()) {
+            std::string tmp = std::move(thread_queue_.front());
+            thread_queue_.pop_front();
+            lock.unlock();
+            if (file_.is_open())
+                file_ << tmp << std::endl;
+            lock.lock();
+        }
+    }
+}
+
 xlib::logger::LogWriter::LogWriter(const std::string &_file_log) {
     show_flag_ |= 0b11;
     file_.open(_file_log, std::ios::out | std::ios::app);
     if (!file_.is_open())
         std::cerr << "Failed to open file: " << _file_log << std::endl;
+    if constexpr (ENABLE_THREAD_LOGGER) {
+        thread_is_run_ = true;
+        thread_forWriting_ = std::thread(&LogWriter::thread_write_ipt_impl, this);
+    }
 }
 
 xlib::logger::LogWriter::LogWriter() {
     show_flag_ |= 0b01;
+    if constexpr (ENABLE_THREAD_LOGGER) {
+        thread_is_run_ = true;
+        thread_forWriting_ = std::thread(&LogWriter::thread_write_ipt_impl, this);
+    }
 }
 
 xlib::logger::LogWriter::~LogWriter() {
+    if constexpr (ENABLE_THREAD_LOGGER) {
+        thread_is_run_ = false;
+        thread_cv_.notify_all();
+        thread_forWriting_.join();
+    }
     file_.close();
 }
 
@@ -64,15 +81,27 @@ std::string xlib::logger::LogWriter::set_timestamp(const LogTimeStyle _style) {
     return oss.str();
 }
 
+void xlib::logger::LogWriter::log() {
+    if constexpr (ENABLE_THREAD_LOGGER) {
+        {
+            std::lock_guard<std::mutex> lock(thread_mutex_);
+            thread_queue_.push_back(entity_.format());
+        }
+        thread_cv_.notify_one();
+    }
+    else
+        write_ipt_impl();
+}
+
 void xlib::logger::LogWriter::log(const LogLevel _level,const std::string& _tittle, const std::string& _info, const LogTimeStyle _time_style) {
     entity_.clean();
     entity_ = {
         .level = _level,
+        .timestamp = set_timestamp(_time_style),
         .title = _tittle,
         .information = _info,
-        .timestamp = set_timestamp(_time_style),
     };
-    write();
+    this->log();
 }
 
 void xlib::logger::LogWriter::debug(const std::string &_tittle, const std::string &_info, LogTimeStyle _time_style) {
