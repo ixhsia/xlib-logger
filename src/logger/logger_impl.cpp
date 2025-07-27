@@ -1,5 +1,5 @@
 #include "logger/logger_impl.hpp"
-
+#include <string>
 std::string xlib::logger::_get_log_level_str(const uint8_t _level) {
     switch (_level) {
         case 0:  return "[DEBUG]";
@@ -15,10 +15,41 @@ void xlib::logger::_command_print(const LoggerEntity &_entity) {
     std::cout << _entity.format() << std::endl;
 }
 
+void xlib::logger::LogWriter::init_for_base_config() {
+    ///TODO: Configure
+
+    std::string log_name{};
+    //log rolling
+    const auto size_tmp = parse_["logger"]["log_rolling_size"].value<size_t>();
+    if (size_tmp.has_value()) {
+        is_rolling_ = true;
+        rolling_size_ = size_tmp.value();
+        log_file_name_styled_raw_ = parse_["file"]["log_name"].value_or<std::string>("log_${time}");
+        log_name = log_style_name_analysis(log_file_name_styled_raw_);
+    }
+    else {
+        is_rolling_ = false;
+        log_name = parse_["file"]["log_file"].value_or("log.log");
+    };
+
+    // get log_file
+    log_file_path_ = parse_["file"]["log_dir"].value_or("./");
+    const std::string file_log = log_file_path_ + log_name;
+    // open log_file
+    file_->open(file_log, std::ios::out | std::ios::app);
+    if (!file_->is_open())
+        std::cerr << "Failed to open file: " << file_log << std::endl;
+
+    //config logger
+    set_logger_level_line(static_cast<LogLevel>(parse_["logger"]["level"].value_or(1)));
+    set_logger_thread_isEnabled(parse_["logger"]["thread"].value_or(true));
+    set_show_flag(parse_["logger"]["show_flag"].value_or(0x03));
+}
+
 void xlib::logger::LogWriter::init_from_file_log(const std::string &_file_log) {
     show_flag_ |= xlib::Flags::ShowSinkFlag::Sink_All;
-    file_.open(_file_log, std::ios::out | std::ios::app);
-    if (!file_.is_open())
+    file_->open(_file_log, std::ios::out | std::ios::app);
+    if (!file_->is_open())
         std::cerr << "Failed to open file: " << _file_log << std::endl;
 }
 
@@ -34,17 +65,7 @@ void xlib::logger::LogWriter::init_from_file_config(const std::string &_file_con
         }
         std::cout << "OK"<< std::endl;
     } catch (...) {throw std::runtime_error("Illegal config file: " + _file_config);}
-    const std::string file_log = parse_["log_file"].value_or("log.log");
-    file_.open(file_log, std::ios::out | std::ios::app);
-    if (!file_.is_open())
-        std::cerr << "Failed to open file: " << file_log << std::endl;
-
-    //TODO: Configure
-    //config logger
-    auto *logger = parse_["logger"].as_table();
-    this->set_logger_level_line(static_cast<LogLevel>(logger->at("level").value_or(1)));
-    this->set_logger_thread_isEnabled(logger->at("thread").value_or(true));
-    this->set_show_flag(logger->at("show_flag").value_or(0x03));
+   this->init_for_base_config();
 }
 
 void xlib::logger::LogWriter::write_ipt_impl() {
@@ -52,8 +73,8 @@ void xlib::logger::LogWriter::write_ipt_impl() {
         _command_print(entity_);
     }
     if (show_flag_ & 0b10) {
-        file_ << entity_.format() << std::endl;;
-        file_.flush();
+        *file_ << entity_.format() << std::endl;;
+        file_->flush();
     }
     entity_.clean();
 }
@@ -69,11 +90,43 @@ void xlib::logger::LogWriter::thread_write_ipt_impl() {
                 std::string tmp = std::move(thread_queue_.front());
                 thread_queue_.pop_front();
                 lock.unlock();
-                if (file_.is_open())
-                    file_ << tmp << std::endl;
+                if (file_->is_open())
+                    *file_ << tmp << std::endl;
                 lock.lock();
             }
         }
+}
+
+std::string xlib::logger::LogWriter::log_style_name_analysis(std::string _styled_name) const {
+    auto rule = [&](const std::string& param) {
+        switch (param) {
+            case "time":    return entity_.timestamp;
+            case "level":   return _get_log_level_str(entity_.level);
+            case "title":   return entity_.title;
+            case "counter": return std::to_string(log_rolling_counter_);
+            default:        return param;
+        }
+    };
+
+    std::vector<std::string> final{};
+    for (auto it = _styled_name.begin(); it != _styled_name.end(); ++it) {
+        if (*it == '$') {
+            ++it;
+            if (*it == '{') {
+                std::vector<char> tmp{};
+                while (*it != '}') {
+                    tmp.push_back(*it);
+                    ++it;
+                }
+                auto param = rule(std::string(tmp.begin(), tmp.end()));
+                final.push_back(param);
+            }
+        }
+        else
+            final.emplace_back(1, *it);
+    }
+    std::string tmp(final.begin(), final.end());
+    return tmp;
 }
 
 std::unique_ptr<xlib::logger::LogWriter> xlib::logger::LogWriter::from_file_config(const std::string &_file_config) {
@@ -103,7 +156,10 @@ xlib::logger::LogWriter::~LogWriter() {
         thread_cv_.notify_all();
         thread_forWriting_.join();
     }
-    file_.close();
+    if (file_ != nullptr && file_->is_open())
+        file_->close();
+    delete file_;
+    file_ = nullptr;
 }
 
 std::string xlib::logger::LogWriter::set_msg_timestamp(const LogTimeStyle _style) {
@@ -115,6 +171,17 @@ std::string xlib::logger::LogWriter::set_msg_timestamp(const LogTimeStyle _style
     oss << '(' << std::put_time(&tm, log_time_style_strs_[static_cast<uint8_t>(_style)].c_str()) << ')';
     entity_.timestamp = oss.str();
     return oss.str();
+}
+
+void xlib::logger::LogWriter::close_and_open_next_rolling_logFile() const {
+    const std::string log_name = log_style_name_analysis(log_file_name_styled_raw_);
+    const std::string file_log = log_file_path_ + log_name;
+    if (file_ != nullptr && file_->is_open()) {
+        file_->close();
+        file_->open(file_log, std::ios::out | std::ios::app);
+        if (!file_->is_open())
+            std::cerr << "Failed to open file: " << file_log << std::endl;
+    }
 }
 
 void xlib::logger::LogWriter::log() {

@@ -87,11 +87,19 @@ namespace xlib::logger {
     class LogWriter {
         // 日志基本变量
         LoggerEntity entity_ {};
-        std::ofstream file_{};
+        std::ofstream* file_ = new std::ofstream();;
         std::vector<Sink_Base> sinks_{};
         uint8_t show_flag_ = 0x00;
         bool is_thread_log_enabled_ = true;
         LogLevel log_level_line_ = XLIB_LOG_LEVEL_DEBUG;
+
+        //rolling
+        bool is_rolling_ = false;
+        size_t rolling_size_{}; // 默认1MB
+        std::string log_file_path_ = "./"; // 默认日志文件路径
+        std::string log_file_name_styled_raw_{};
+        size_t log_rolling_counter_{};
+
 
         // 多线程配置
         std::deque<std::string> thread_queue_{};
@@ -158,11 +166,15 @@ namespace xlib::logger {
         std::string set_msg_timestamp(LogTimeStyle _style);
 
     private:
+        void init_for_base_config();
         void init_from_file_log(const std::string& _file_log);
         void init_from_file_config(const std::string& _file_config);
         void write_ipt_impl();
         void thread_write_ipt_impl();
+        std::string log_style_name_analysis(std::string _styled_name) const;
+        void rolling_next_log_file();
 
+        void close_and_open_next_rolling_logFile() const;
     public:
         void log();
         void log(LogLevel _level, const std::string& _tittle, const std::string& _info, LogTimeStyle _time_style = YYYY_md_HMS_withDash);
