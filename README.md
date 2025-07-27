@@ -20,6 +20,7 @@ You can either:
 ---
 ## Configuration
 Xlib-Logger supports configuration via [TOML](https://toml.io).
+
 You can create a `.toml` file anywhere you like and load it by calling:
 
 ```cpp
