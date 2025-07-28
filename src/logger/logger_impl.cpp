@@ -1,17 +1,7 @@
 #include "logger/logger_impl.hpp"
+#include <iostream>
 #include <string>
 #include <unordered_map>
-
-std::string xlib::logger::_get_log_level_str(const uint8_t _level) {
-    switch (_level) {
-        case 0:  return "[DEBUG]";
-        case 1:  return "[INFO]";
-        case 2:  return "[WARNING]";
-        case 3:  return "[ERROR]";
-        case 4:  return "[FATAL]";
-        default: return "[UNKNOWN]";
-    }
-}
 
 void xlib::logger::_command_print(const LoggerEntity &_entity) {
     std::cout << _entity.format() << std::endl;
@@ -69,6 +59,7 @@ void xlib::logger::LogWriter::init_from_file_config(const std::string &_file_con
    this->init_for_base_config();
 }
 
+//TODO: DEL it
 void xlib::logger::LogWriter::write_ipt_impl() {
     if (show_flag_ & 0b01) {
         _command_print(entity_);
@@ -80,6 +71,7 @@ void xlib::logger::LogWriter::write_ipt_impl() {
     entity_.clean();
 }
 
+//TODO: DEL it
 void xlib::logger::LogWriter::thread_write_ipt_impl() {
     while (thread_is_run_ || !thread_queue_.empty()) {
         std::unique_lock<std::mutex> lock(thread_mutex_);
@@ -108,11 +100,11 @@ std::string xlib::logger::LogWriter::log_style_name_analysis(std::string _styled
     auto rule = [&](const std::string& param) {
         try {
             switch (paramsMap.at(param)) {
-                case 0:    return set_timestamp_name();
-                case 1:   return _get_log_level_str(entity_.level);
-                case 2:   return entity_.title;
-                case 3: return std::to_string(log_rolling_counter_);
-                default:        return param;
+                case 0:     return set_timestamp_name();
+                case 1:     return _get_log_level_str(entity_.level);
+                case 2:     return entity_.title;
+                case 3:     return std::to_string(log_rolling_counter_);
+                default:    return param;
             }
         } catch (...) {return param;}
     };

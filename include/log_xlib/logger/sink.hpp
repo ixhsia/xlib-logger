@@ -1,24 +1,45 @@
 #ifndef SINK_HPP
 #define SINK_HPP
 
+#include <cstdint>
+#include <iostream>
+#include <ostream>
+
+#include "interface.hpp"
+
 //TODO: sink module for logger, need to finish it
 namespace xlib::logger {
-    struct LoggerEntity;
+    class Sink : public ILogSink {
+    protected:
+        uint8_t show_flag_ = 0x00;
+        static LoggerEntity entity_;
 
-    class Sink_Base {
     public:
-        Sink_Base() = default;
-        virtual ~Sink_Base() = default;
-        virtual void write() = 0;
+        Sink() = default;
+        ~Sink() override = default;
+
+        void write_in() override = 0;
+        static void update_entity(const LoggerEntity &_entity) {
+            entity_.clean();
+            entity_ = _entity;
+        }
+
+        void read_in_entity(const LoggerEntity &_entity) override;
+        void func_flags(const uint8_t _flag) override {
+            show_flag_ = _flag;
+        }
     };
 
-    class Sink_Console final : public Sink_Base {
+    class Sink_Command final : private Sink {
     public:
-        void write() override;
+        void write_in() override {
+            std::cout << entity_.format() << std::endl;
+        }
     };
-    class Sink_File final : public Sink_Base {
+
+    class Sink_Files final : private Sink {
     public:
-        void write() override;
+        void write_in() override;
     };
 
 }

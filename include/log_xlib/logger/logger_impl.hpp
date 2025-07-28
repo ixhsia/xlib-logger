@@ -3,15 +3,13 @@
 #include <atomic>
 #include <string>
 #include <fstream>
-#include <chrono>
 #include <deque>
-#include <iostream>
 #include <mutex>
 #include <thread>
-#include <vector>
-#include "logger/sink.hpp"
+
 #include "toml.hpp"
 #include "definations.hpp"
+#include "interface.hpp"
 
 /// 仅仅是想实现类似独热编码的效果，只是不愿意 '#define'
 namespace xlib::Flags::ShowSinkFlag {
@@ -26,13 +24,6 @@ namespace xlib::logger {
     {
         Disabled = 0,
         Enabled,
-    };
-    enum LogLevel {
-        XLIB_LOG_LEVEL_DEBUG = 0,
-        XLIB_LOG_LEVEL_INFO,
-        XLIB_LOG_LEVEL_WARNING,
-        XLIB_LOG_LEVEL_ERROR,
-        XLIB_LOG_LEVEL_FATAL,
     };
     enum LogTimeStyle
     {
@@ -57,38 +48,12 @@ namespace xlib::logger {
         yy_md_HMS_withDotDot,
     };
 
-    std::string _get_log_level_str(uint8_t _level);
-
-    struct LoggerEntity {
-        LogLevel    level;
-        std::string timestamp;
-        std::string title;
-        std::string information;
-
-        void clean() {
-            level = XLIB_LOG_LEVEL_DEBUG;
-            timestamp.clear();
-            title.clear();
-            information.clear();
-        }
-        [[nodiscard]] std::string format() const {
-            std::ostringstream oss;
-            const std::string level_str = _get_log_level_str(static_cast<uint8_t>(level));
-            oss <<  level_str      << " "
-                <<  timestamp      << " "
-                <<  title          << " > "
-                <<  information;
-            return  oss.str();
-        }
-    };
-
     void _command_print(const LoggerEntity& _entity);
 
     class LogWriter {
         // 日志基本变量
         LoggerEntity entity_ {};
         std::ofstream* file_ = new std::ofstream();;
-        std::vector<Sink_Base> sinks_{};
         uint8_t show_flag_ = 0x00;
         bool is_thread_log_enabled_ = true;
         LogLevel log_level_line_ = XLIB_LOG_LEVEL_DEBUG;
