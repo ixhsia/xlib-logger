@@ -164,6 +164,7 @@ namespace xlib::logger {
             entity_.timestamp = _timestamp;
         }
         std::string set_msg_timestamp(LogTimeStyle _style);
+        static std::string set_timestamp_name();
 
     private:
         void init_for_base_config();

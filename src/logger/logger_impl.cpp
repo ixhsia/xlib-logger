@@ -1,5 +1,7 @@
 #include "logger/logger_impl.hpp"
 #include <string>
+#include <unordered_map>
+
 std::string xlib::logger::_get_log_level_str(const uint8_t _level) {
     switch (_level) {
         case 0:  return "[DEBUG]";
@@ -63,7 +65,6 @@ void xlib::logger::LogWriter::init_from_file_config(const std::string &_file_con
             init_from_file_log("./error.log");
             return void();
         }
-        std::cout << "OK"<< std::endl;
     } catch (...) {throw std::runtime_error("Illegal config file: " + _file_config);}
    this->init_for_base_config();
 }
@@ -80,32 +81,40 @@ void xlib::logger::LogWriter::write_ipt_impl() {
 }
 
 void xlib::logger::LogWriter::thread_write_ipt_impl() {
-    if (show_flag_ & xlib::Flags::ShowSinkFlag::Sink_CommandLine)
-        _command_print(entity_);
-    if (show_flag_ & xlib::Flags::ShowSinkFlag::Sink_File)
-        while (thread_is_run_ || !thread_queue_.empty()) {
-            std::unique_lock<std::mutex> lock(thread_mutex_);
-            thread_cv_.wait(lock, [this] {return !thread_queue_.empty() || !thread_is_run_;});
-            while (!thread_queue_.empty()) {
-                std::string tmp = std::move(thread_queue_.front());
-                thread_queue_.pop_front();
-                lock.unlock();
+    while (thread_is_run_ || !thread_queue_.empty()) {
+        std::unique_lock<std::mutex> lock(thread_mutex_);
+        thread_cv_.wait(lock, [this] {return !thread_queue_.empty() || !thread_is_run_;});
+        while (!thread_queue_.empty()) {
+            std::string tmp = std::move(thread_queue_.front());
+            thread_queue_.pop_front();
+            lock.unlock();
+            if (show_flag_ & xlib::Flags::ShowSinkFlag::Sink_CommandLine)
+                std::cout << tmp << std::endl;
+            if (show_flag_ & xlib::Flags::ShowSinkFlag::Sink_File)
                 if (file_->is_open())
                     *file_ << tmp << std::endl;
-                lock.lock();
-            }
+            lock.lock();
         }
+    }
 }
 
 std::string xlib::logger::LogWriter::log_style_name_analysis(std::string _styled_name) const {
+    const std::unordered_map<std::string, int> paramsMap = {
+        {"time" , 0},
+        {"level", 1},
+        {"title", 2},
+        {"counter", 3},
+    };
     auto rule = [&](const std::string& param) {
-        switch (param) {
-            case "time":    return entity_.timestamp;
-            case "level":   return _get_log_level_str(entity_.level);
-            case "title":   return entity_.title;
-            case "counter": return std::to_string(log_rolling_counter_);
-            default:        return param;
-        }
+        try {
+            switch (paramsMap.at(param)) {
+                case 0:    return set_timestamp_name();
+                case 1:   return _get_log_level_str(entity_.level);
+                case 2:   return entity_.title;
+                case 3: return std::to_string(log_rolling_counter_);
+                default:        return param;
+            }
+        } catch (...) {return param;}
     };
 
     std::vector<std::string> final{};
@@ -113,6 +122,7 @@ std::string xlib::logger::LogWriter::log_style_name_analysis(std::string _styled
         if (*it == '$') {
             ++it;
             if (*it == '{') {
+                ++it;
                 std::vector<char> tmp{};
                 while (*it != '}') {
                     tmp.push_back(*it);
@@ -125,7 +135,9 @@ std::string xlib::logger::LogWriter::log_style_name_analysis(std::string _styled
         else
             final.emplace_back(1, *it);
     }
-    std::string tmp(final.begin(), final.end());
+    std::string tmp{};
+    for (const auto& str : final)
+        tmp += str;
     return tmp;
 }
 
@@ -170,6 +182,16 @@ std::string xlib::logger::LogWriter::set_msg_timestamp(const LogTimeStyle _style
     std::ostringstream oss;
     oss << '(' << std::put_time(&tm, log_time_style_strs_[static_cast<uint8_t>(_style)].c_str()) << ')';
     entity_.timestamp = oss.str();
+    return oss.str();
+}
+
+std::string xlib::logger::LogWriter::set_timestamp_name() {
+    const auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    std::tm tm = *std::localtime(&now);
+    localtime_r(&now, &tm);
+
+    std::ostringstream oss;
+    oss << std::put_time(&tm, "%Y-%m-%d-%H-%M-%S");
     return oss.str();
 }
 
