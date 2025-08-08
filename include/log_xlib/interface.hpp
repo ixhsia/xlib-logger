@@ -1,6 +1,18 @@
 #ifndef INTERFACE_HPP
 #define INTERFACE_HPP
+#include <any>
+
 #include "loggerEntity.hpp"
+#include "logger/sink_dataStructure.hpp"
+
+/// 仅仅是想实现类似独热编码的效果，只是不愿意 '#define'
+namespace xlib::Flags::ShowSinkFlag {
+    constexpr uint8_t Show_None            = 0b0000'0000;
+    constexpr uint8_t Sink_CommandLine     = 0b0000'0001;
+    constexpr uint8_t Sink_File            = 0b0000'0010;
+    constexpr uint8_t Sink_Network         = 0b0000'0100;
+    constexpr uint8_t Sink_All             = Sink_CommandLine | Sink_File | Sink_Network;
+}
 
 namespace xlib::logger {
     class ILogSink {
@@ -8,14 +20,14 @@ namespace xlib::logger {
         ILogSink() = default;
         virtual ~ILogSink() = default;
 
-        virtual void read_in_entity(const LoggerEntity& _entity) = 0;
-        virtual void write_in() = 0;
-
-        virtual void func_flags(uint8_t _flag) = 0;
+        virtual void set_config(SinkDataStructure* _configs) = 0;
+        virtual void update(const LoggerEntity& _entity) = 0;
     };
 
     //TODO: FINISH it
-    class ILoggerSinkParam {
+    struct ILoggerSinkParam {
+        uint8_t type;
+        std::any sink_content;
     };
 
 }

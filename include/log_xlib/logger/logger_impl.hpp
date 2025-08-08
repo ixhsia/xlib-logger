@@ -1,3 +1,5 @@
+/// @file logger_impl.hpp
+/// @brief 日志写入器实现头文件，包含日志记录、格式化和多线程支持的实现细节。
 #ifndef LOGGER_IMPL_HPP
 #define LOGGER_IMPL_HPP
 #include <atomic>
@@ -11,20 +13,13 @@
 #include "definations.hpp"
 #include "interface.hpp"
 
-/// 仅仅是想实现类似独热编码的效果，只是不愿意 '#define'
-namespace xlib::Flags::ShowSinkFlag {
-    constexpr uint8_t Show_None            = 0b0000'0000;
-    constexpr uint8_t Sink_CommandLine     = 0b0000'0001;
-    constexpr uint8_t Sink_File            = 0b0000'0010;
-    constexpr uint8_t Sink_All             = Sink_CommandLine | Sink_File;
-}
-
 namespace xlib::logger {
     enum SetStatus
     {
         Disabled = 0,
         Enabled,
     };
+    /// 日志时间格式枚举
     enum LogTimeStyle
     {
         YYYY_md_HMS_withNone = 0,
@@ -48,8 +43,8 @@ namespace xlib::logger {
         yy_md_HMS_withDotDot,
     };
 
-    void _command_print(const LoggerEntity& _entity);
-
+    /// @class LogWriter
+    /// @brief 日志写入器类，负责处理日志的写入、格式化和多线程支持。
     class LogWriter {
         // 日志基本变量
         LoggerEntity entity_ {};
@@ -64,7 +59,6 @@ namespace xlib::logger {
         std::string log_file_path_ = "./"; // 默认日志文件路径
         std::string log_file_name_styled_raw_{};
         size_t log_rolling_counter_{};
-
 
         // 多线程配置
         std::deque<std::string> thread_queue_{};
@@ -100,11 +94,19 @@ namespace xlib::logger {
         };
 
     public:
-        static std::unique_ptr<LogWriter> from_file_config(const std::string& _file_config);
-        static std::unique_ptr<LogWriter> from_file_log(const std::string& _file_log);
         LogWriter() = default;
-        void set_thread_ifEnabled();
         ~LogWriter();
+
+        /// @brief 从默认配置文件加载日志写入器
+        /// @param _file_config 配置文件路径
+        /// @return std::unique_ptr<LogWriter> 返回日志写入器的智能指针
+        static std::unique_ptr<LogWriter> from_file_config(const std::string& _file_config);
+        /// @brief 从指定日志文件加载日志写入器
+        /// @param _file_log 日志文件路径
+        /// @return std::unique_ptr<LogWriter> 返回日志写入器的智能指针
+        static std::unique_ptr<LogWriter> from_file_log(const std::string& _file_log);
+        /// @brief 判定线程标志位，如果启用多线程日志记录，则创建一个线程来处理日志写入
+        void set_thread_ifEnabled();
 
         void set_logger_level_line(const LogLevel _level) {
             log_level_line_ = _level;
@@ -112,7 +114,6 @@ namespace xlib::logger {
         void set_logger_thread_isEnabled(const bool _enabled) {
             is_thread_log_enabled_ = _enabled;
         }
-
         void set_msg_level(const LogLevel _level) {
             entity_.level = _level;
         }
@@ -142,12 +143,38 @@ namespace xlib::logger {
 
         void close_and_open_next_rolling_logFile() const;
     public:
+        /// @brief 记录日志的主要接口函数, 无参数版本提交当前entity_结构体
         void log();
+        /// @brief 记录日志的主要接口函数
+        /// @param _level 日志级别
+        /// @param _tittle 日志标题
+        /// @param _info 日志信息
+        /// @param _time_style 时间格式, 默认YYYY_mm_dd_HH_MM_SS_withDash
         void log(LogLevel _level, const std::string& _tittle, const std::string& _info, LogTimeStyle _time_style = YYYY_md_HMS_withDash);
+        /// @brief 记录日志的主要接口函数, 默认日志级别为DEBUG
+        /// @param _tittle 日志标题
+        /// @param _info 日志信息
+        /// @param _time_style 时间格式, 默认YYYY_mm_dd_HH_MM_SS_withDash
         void debug(const std::string& _tittle, const std::string& _info, LogTimeStyle _time_style = YYYY_md_HMS_withDash);
+        /// @brief 记录日志的主要接口函数, 默认日志级别为INFO
+        /// @param _tittle 日志标题
+        /// @param _info 日志信息
+        /// @param _time_style 时间格式, 默认YYYY_mm_dd_HH_MM_SS_withDash
         void info(const std::string& _tittle, const std::string& _info, LogTimeStyle _time_style = YYYY_md_HMS_withDash);
+        /// @brief 记录日志的主要接口函数, 默认日志级别为WARNING
+        /// @param _tittle 日志标题
+        /// @param _info 日志信息
+        /// @param _time_style 时间格式, 默认YYYY_mm_dd_HH_MM_SS_withDash
         void warning(const std::string& _tittle, const std::string& _info, LogTimeStyle _time_style = YYYY_md_HMS_withDash);
+        /// @brief 记录日志的主要接口函数, 默认日志级别为ERROR
+        /// @param _tittle 日志标题
+        /// @param _info 日志信息
+        /// @param _time_style 时间格式, 默认YYYY_mm_dd_HH_MM_SS_withDash
         void error(const std::string& _tittle, const std::string& _info, LogTimeStyle _time_style = YYYY_md_HMS_withDash);
+        /// @brief 记录日志的主要接口函数, 默认日志级别为FATAL
+        /// @param _tittle 日志标题
+        /// @param _info 日志信息
+        /// @param _time_style 时间格式, 默认YYYY_mm_dd_HH_MM_SS_withDash
         void fatal(const std::string& _tittle, const std::string& _info, LogTimeStyle _time_style = YYYY_md_HMS_withDash);
 
     };

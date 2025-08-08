@@ -1,45 +1,65 @@
 #ifndef SINK_HPP
 #define SINK_HPP
 
+#include <atomic>
 #include <cstdint>
+#include <deque>
 #include <iostream>
+#include <memory>
+#include <mutex>
 #include <ostream>
-
+#include <thread>
+#include <expected>
+#include <vector>
 #include "interface.hpp"
+#include <fstream>
 
 //TODO: sink module for logger, need to finish it
 namespace xlib::logger {
-    class Sink : public ILogSink {
-    protected:
-        uint8_t show_flag_ = 0x00;
-        static LoggerEntity entity_;
+    class SinkManager {
+        //TODO: class ThreadPool in new file
+
+        // // 多线程配置
+        // std::deque<std::string> thread_queue_{};
+        // std::mutex thread_mutex_{};
+        // std::condition_variable thread_cv_{};
+        // std::atomic<bool> thread_is_run_ = false;
+        // std::thread thread_forRunning_{};
+
+        std::vector<ILogSink*> sink_list_{};
+    public:
+        static SinkManager& get_instance() {
+            static SinkManager instance;
+            return instance;
+        }
+        void registration(const std::tuple<uint8_t, std::any> &_sink_param);
+        // void start_thread();
+        void update(const LoggerEntity& _entity) const;
+        // void stop_thread();
+        void clean_sink_pool();
+    };
+
+    class Sink_Command final : public ILogSink {
 
     public:
-        Sink() = default;
-        ~Sink() override = default;
-
-        void write_in() override = 0;
-        static void update_entity(const LoggerEntity &_entity) {
-            entity_.clean();
-            entity_ = _entity;
-        }
-
-        void read_in_entity(const LoggerEntity &_entity) override;
-        void func_flags(const uint8_t _flag) override {
-            show_flag_ = _flag;
+        void set_config(SinkDataStructure* _configs) override;
+        void update(const LoggerEntity &_entity) override{
+            std::cout << _entity.format() << std::endl;
         }
     };
 
-    class Sink_Command final : private Sink {
+    class Sink_Files final : public ILogSink {
+        std::ofstream* file_ = new std::ofstream();
     public:
-        void write_in() override {
-            std::cout << entity_.format() << std::endl;
-        }
+        void set_config(SinkDataStructure* _configs) override;
+        void update(const LoggerEntity &_entity) override;
     };
 
-    class Sink_Files final : private Sink {
+    class Sink_Network final : public ILogSink {
+        std::string url_{};
     public:
-        void write_in() override;
+        void set_config(SinkDataStructure* _configs) override;
+        void update(const LoggerEntity &_entity) override;
     };
 
 }

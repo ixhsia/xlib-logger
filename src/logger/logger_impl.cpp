@@ -3,9 +3,6 @@
 #include <string>
 #include <unordered_map>
 
-void xlib::logger::_command_print(const LoggerEntity &_entity) {
-    std::cout << _entity.format() << std::endl;
-}
 
 void xlib::logger::LogWriter::init_for_base_config() {
     ///TODO: Configure
@@ -62,7 +59,7 @@ void xlib::logger::LogWriter::init_from_file_config(const std::string &_file_con
 //TODO: DEL it
 void xlib::logger::LogWriter::write_ipt_impl() {
     if (show_flag_ & 0b01) {
-        _command_print(entity_);
+        std::cout << entity_.format() << std::endl;
     }
     if (show_flag_ & 0b10) {
         *file_ << entity_.format() << std::endl;;
