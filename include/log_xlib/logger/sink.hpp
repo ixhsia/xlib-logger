@@ -1,18 +1,13 @@
 #ifndef SINK_HPP
 #define SINK_HPP
 
-#include <atomic>
 #include <cstdint>
-#include <deque>
 #include <iostream>
-#include <memory>
 #include <mutex>
-#include <ostream>
-#include <thread>
-#include <expected>
 #include <vector>
-#include "interface.hpp"
 #include <fstream>
+#include "interface.hpp"
+#include "utilities/thread_pool.hpp"
 
 //TODO: sink module for logger, need to finish it
 namespace xlib::logger {
@@ -40,9 +35,8 @@ namespace xlib::logger {
     };
 
     class Sink_Command final : public ILogSink {
-
     public:
-        void set_config(SinkDataStructure* _configs) override;
+        void set_config(SinkDataStructure *_configs) override {return void();}
         void update(const LoggerEntity &_entity) override{
             std::cout << _entity.format() << std::endl;
         }
@@ -50,16 +44,28 @@ namespace xlib::logger {
 
     class Sink_Files final : public ILogSink {
         std::ofstream* file_ = new std::ofstream();
+
+        bool is_rolling_ = false;
+        uint32_t log_rolling_size_ = 0;
+        std::string log_name_rolling_ = "log_${time}";
+        size_t log_rolling_counter_{};
     public:
         void set_config(SinkDataStructure* _configs) override;
         void update(const LoggerEntity &_entity) override;
+
+        static std::string get_timestamp_now();
+
+    private:
+
+        [[nodiscard]] std::string log_style_name_analysis(const std::string& _styled_name, LoggerEntity _entity) const;
     };
 
+    /// DISABLED
     class Sink_Network final : public ILogSink {
         std::string url_{};
     public:
         void set_config(SinkDataStructure* _configs) override;
-        void update(const LoggerEntity &_entity) override;
+        void update(const LoggerEntity &_entity) override{return void();}
     };
 
 }

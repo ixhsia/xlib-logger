@@ -17,6 +17,11 @@ namespace xlib::logger {
 
         std::string file_path;
         std::string file_name;
+
+        //rolling config
+        bool is_rolling = false;
+        uint32_t log_rolling_size = 0;
+        std::string log_name = "log_${time}";
     };
     struct SinkDataStructure_Network: SinkDataStructure {
         ~SinkDataStructure_Network() override = default;
