@@ -1,5 +1,6 @@
 #ifndef LOGGER_ENTITY_HPP
 #define LOGGER_ENTITY_HPP
+#include <sstream>
 
 namespace xlib::logger {
     enum LogLevel {
@@ -10,7 +11,7 @@ namespace xlib::logger {
         XLIB_LOG_LEVEL_FATAL,
     };
 
-    inline std::string xlib::logger::_get_log_level_str(const uint8_t _level) {
+    inline std::string _get_log_level_str(const uint8_t _level) {
         switch (_level) {
             case 0:  return "[DEBUG]";
             case 1:  return "[INFO]";

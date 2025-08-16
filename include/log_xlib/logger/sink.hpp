@@ -6,32 +6,36 @@
 #include <mutex>
 #include <vector>
 #include <fstream>
+#include <toml.hpp>
+
 #include "interface.hpp"
 #include "utilities/thread_pool.hpp"
-
-//TODO: sink module for logger, need to finish it
 namespace xlib::logger {
+    struct SinkManagerInit {;
+        bool is_thread_enabled = true;
+        LogLevel level_filter = XLIB_LOG_LEVEL_DEBUG;
+    };
+
     class SinkManager {
         //TODO: class ThreadPool in new file
 
-        // // 多线程配置
-        // std::deque<std::string> thread_queue_{};
-        // std::mutex thread_mutex_{};
-        // std::condition_variable thread_cv_{};
-        // std::atomic<bool> thread_is_run_ = false;
-        // std::thread thread_forRunning_{};
-
+        LogLevel level_filter_ = XLIB_LOG_LEVEL_DEBUG;
+        bool is_thread_enabled_ = true;
         std::vector<ILogSink*> sink_list_{};
+
     public:
         static SinkManager& get_instance() {
             static SinkManager instance;
             return instance;
         }
+        void init_manager(SinkManagerInit &_init);
         void registration(const std::tuple<uint8_t, std::any> &_sink_param);
         // void start_thread();
         void update(const LoggerEntity& _entity) const;
         // void stop_thread();
         void clean_sink_pool();
+
+
     };
 
     class Sink_Command final : public ILogSink {
@@ -44,20 +48,23 @@ namespace xlib::logger {
 
     class Sink_Files final : public ILogSink {
         std::ofstream* file_ = new std::ofstream();
+        toml::table log_sys_information_{};
+        SinkDataStructure_File config_{};
 
-        bool is_rolling_ = false;
-        uint32_t log_rolling_size_ = 0;
-        std::string log_name_rolling_ = "log_${time}";
-        size_t log_rolling_counter_{};
+        size_t log_rolling_counter_ = 0;
+        size_t file_counter_ = 0;
     public:
         void set_config(SinkDataStructure* _configs) override;
         void update(const LoggerEntity &_entity) override;
 
         static std::string get_timestamp_now();
 
+        std::optional<bool> log_sys_info_load(const std::string &_file_path);
+        void log_sys_info_save(const std::string& _saved_name);
     private:
-
-        [[nodiscard]] std::string log_style_name_analysis(const std::string& _styled_name, LoggerEntity _entity) const;
+        [[nodiscard]] bool is_rolling_next() const;
+        void rolling_next(const LoggerEntity& _entity);
+        [[nodiscard]] std::string log_style_name_analysis(const std::string &_styled_name, const LoggerEntity &_entity) const;
     };
 
     /// DISABLED

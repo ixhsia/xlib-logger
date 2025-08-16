@@ -23,13 +23,6 @@ namespace xlib::logger {
         virtual void set_config(SinkDataStructure* _configs) = 0;
         virtual void update(const LoggerEntity& _entity) = 0;
     };
-
-    //TODO: FINISH it
-    struct ILoggerSinkParam {
-        uint8_t type;
-        std::any sink_content;
-    };
-
 }
 
 #endif // INTERFACE_HPP
