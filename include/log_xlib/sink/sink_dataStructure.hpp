@@ -4,15 +4,11 @@
 #ifndef SINK_DATA_STRUCTURE_HPP
 #define SINK_DATA_STRUCTURE_HPP
 #include <unordered_map>
+#include "core/sink_manager.hpp"
 
 namespace xlib::logger {
-    struct SinkDataStructure {
-        virtual ~SinkDataStructure() = default;
-    };
-    struct SinkDataStructure_CommandLine: SinkDataStructure {
-        ~SinkDataStructure_CommandLine() override = default;
-    };
-    struct SinkDataStructure_File: SinkDataStructure {
+
+    struct SinkDataStructure_File final: SinkDataStructure {
         ~SinkDataStructure_File() override = default;
 
         std::string file_path;
@@ -23,7 +19,7 @@ namespace xlib::logger {
         uint32_t log_rolling_size = 0;
         std::string log_name = "log_${time}";
     };
-    struct SinkDataStructure_Network: SinkDataStructure {
+    struct SinkDataStructure_Network final: SinkDataStructure {
         ~SinkDataStructure_Network() override = default;
 
         std::string host;

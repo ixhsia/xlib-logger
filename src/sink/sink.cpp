@@ -1,46 +1,7 @@
-#include "logger/sink.hpp"
-
-#include <definations.hpp>
+#include "sink/sink.hpp"
 #include <sstream>
-#include "logger/logger_impl.hpp"
-
-void xlib::logger::SinkManager::init_manager(SinkManagerInit &_init) {
-    is_thread_enabled_ = _init.is_thread_enabled;
-    level_filter_ = _init.level_filter;
-}
-
-void xlib::logger::SinkManager::registration(const std::tuple<uint8_t, std::any> &_sink_param) {
-    const auto flag = std::get<0>(_sink_param);
-    if (flag == xlib::Flags::ShowSinkFlag::Show_None)
-        return void();
-    if (flag & xlib::Flags::ShowSinkFlag::Sink_CommandLine) {
-        auto config_commandLine = std::any_cast<SinkDataStructure_CommandLine>(std::get<1>(_sink_param));
-        this->sink_list_.emplace_back(new Sink_Command());
-        this->sink_list_.back()->set_config(&config_commandLine);
-    }
-    if (flag & xlib::Flags::ShowSinkFlag::Sink_File) {
-        auto config_file = std::any_cast<SinkDataStructure_File>(std::get<1>(_sink_param));
-        this->sink_list_.emplace_back(new Sink_Files());
-        this->sink_list_.back()->set_config(&config_file);
-    }
-    if (flag & xlib::Flags::ShowSinkFlag::Sink_Network) {
-        auto config_network = std::any_cast<SinkDataStructure_Network>(std::get<1>(_sink_param));
-        this->sink_list_.emplace_back(new Sink_Network());
-        this->sink_list_.back()->set_config(&config_network);
-    }
-}
-
-void xlib::logger::SinkManager::update(const LoggerEntity& _entity) const {
-    for (const auto it : this->sink_list_)
-        it->update(_entity);
-}
-
-void xlib::logger::SinkManager::clean_sink_pool() {
-    for (const auto it : this->sink_list_)
-        delete it;
-    this->sink_list_.clear();
-}
-
+#include "core/logger_impl.hpp"
+#include "interface.hpp"
 void xlib::logger::Sink_Files::set_config(SinkDataStructure *_configs) {
     if (const auto config = dynamic_cast<SinkDataStructure_File*>(_configs)) {
         config_ = *config;

@@ -2,5 +2,8 @@
 #define DEFINITIONS_HPP
 
 #define VERSION 1
+// #define EXTENSIONS_ALLOWED
+
+// #define NAMESPACE_DEFINITION
 
 #endif
